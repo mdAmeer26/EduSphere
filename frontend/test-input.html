@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Input Test</title>
+</head>
+<body>
+    <h1>Simple Input Test</h1>
+    
+    <label>Test Input:</label>
+    <input type="text" id="testInput" placeholder="Type here..." style="padding: 10px; margin: 10px; border: 1px solid #ccc;">
+    
+    <p>You typed: <span id="output">nothing yet</span></p>
+    
+    <script>
+        const input = document.getElementById('testInput');
+        const output = document.getElementById('output');
+        
+        input.addEventListener('input', function(e) {
+            output.textContent = e.target.value || 'nothing yet';
+            console.log('Input changed:', e.target.value);
+        });
+    </script>
+</body>
+</html>

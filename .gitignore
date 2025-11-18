@@ -1,0 +1,95 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+backend/.venv/
+backend/venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/node_modules/
+frontend/dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Uploads and generated files
+backend/uploads/*.txt
+backend/uploads/*.pdf
+backend/uploads/*.ppt
+backend/uploads/*.pptx
+backend/uploads/*.json
+backend/uploads/eduvi_images/
+backend/uploads/eduvi_videos/
+backend/uploads/faces/
+backend/uploads/edutalk_files/
+backend/uploads/market_images/
+backend/uploads/appmaker/
+
+# Keep directory structure
+!backend/uploads/.gitkeep
+!backend/uploads/eduvi_images/.gitkeep
+!backend/uploads/eduvi_videos/.gitkeep
+!backend/uploads/faces/.gitkeep
+!backend/uploads/edutalk_files/.gitkeep
+!backend/uploads/market_images/.gitkeep
+!backend/uploads/appmaker/.gitkeep
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Test files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated files
+*.pyc
+*.pyo
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.avi
