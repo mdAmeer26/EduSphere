@@ -95,15 +95,13 @@ export default function Whiteboard() {
     formData.append('show_steps', 'true')
 
     try {
-      const res = await fetch(apiUrl('/api/whiteboard/solve'), {
+      const res = await fetch(apiUrl('/api/whiteboard/solve-drawing'), {
         method: 'POST',
         body: formData
       })
       const data = await res.json()
-      console.log('Shape detection response:', data)
       setAnswer(data)
     } catch (e) {
-      console.error('Error solving:', e)
       setError(String(e))
     } finally {
       setLoading(false)
@@ -472,12 +470,9 @@ export default function Whiteboard() {
                     marginBottom: '12px',
                     color: '#0f766e',
                     fontSize: '13px',
-                    lineHeight: '1.6',
-                    whiteSpace: 'pre-line'
+                    lineHeight: '1.6'
                   }}>
-                    {answer.answer.split('**').map((part, i) => 
-                      i % 2 === 0 ? part : <strong key={i}>{part}</strong>
-                    )}
+                    {answer.answer}
                   </div>
                 )}
                 

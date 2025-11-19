@@ -3,6 +3,20 @@ import { apiUrl } from '../lib/api'
 
 export default function Meet() {
   const [view, setView] = useState('home') // home, create, meeting
+
+  useEffect(() => {
+    // Add pulse animation for face recognition indicator
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(1.05); }
+      }
+    `
+    document.head.appendChild(style)
+    return () => document.head.removeChild(style)
+  }, [])
+
   const [meetings, setMeetings] = useState([])
   const [currentMeeting, setCurrentMeeting] = useState(null)
   const [userName, setUserName] = useState(localStorage.getItem('eduMeetUserName') || '')
@@ -32,8 +46,11 @@ export default function Meet() {
   const [showWhiteboard, setShowWhiteboard] = useState(false)
   const [showPolls, setShowPolls] = useState(false)
   const [showBreakout, setShowBreakout] = useState(false)
+  const [showAttendancePanel, setShowAttendancePanel] = useState(false)
   const [layout, setLayout] = useState('grid') // grid, speaker, sidebar
   const [attendance, setAttendance] = useState([])
+  const [enrolledUsers, setEnrolledUsers] = useState([])
+  const [faceRecognitionEnabled, setFaceRecognitionEnabled] = useState(false)
   const [polls, setPolls] = useState([])
   const [breakoutRooms, setBreakoutRooms] = useState([])
   const [whiteboardData, setWhiteboardData] = useState({ shapes: [] })
@@ -48,6 +65,8 @@ export default function Meet() {
   
   // Video Refs
   const localVideoRef = useRef(null)
+  const recognitionCanvasRef = useRef(null)
+  const recognitionIntervalRef = useRef(null)
   const remoteVideosRef = useRef({})
 
   useEffect(() => {
@@ -65,10 +84,14 @@ export default function Meet() {
   }
 
   async function createMeeting() {
+    console.log('Create Meeting clicked', { meetingTitle, userName })
+    
     if (!meetingTitle.trim() || !userName.trim()) {
       alert('Please enter meeting title and your name')
       return
     }
+    
+    console.log('Creating meeting...')
     
     try {
       const res = await fetch(apiUrl('/api/edumeet/meeting/create'), {
@@ -90,15 +113,22 @@ export default function Meet() {
           }
         })
       })
+      
+      console.log('Response status:', res.status)
       const data = await res.json()
+      console.log('Response data:', data)
+      
       if (data.meeting) {
         setCurrentMeeting(data.meeting)
         localStorage.setItem('eduMeetUserName', userName)
         setView('meeting')
         initializeMeeting(data.meeting.id)
+      } else {
+        alert('Failed to create meeting: ' + (data.error || 'Unknown error'))
       }
     } catch (e) {
       console.error('Failed to create meeting:', e)
+      alert('Failed to create meeting: ' + e.message)
     }
   }
 
@@ -164,6 +194,14 @@ export default function Meet() {
 
   async function markAttendance(meetingId) {
     try {
+      // Get enrolled users for face recognition
+      const enrolledRes = await fetch(apiUrl('/api/attendance/enrolled'))
+      const enrolledData = await enrolledRes.json()
+      if (enrolledData.ok) {
+        setEnrolledUsers(enrolledData.users || [])
+      }
+
+      // Mark initial attendance
       await fetch(apiUrl('/api/edumeet/attendance/mark'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -173,10 +211,90 @@ export default function Meet() {
           timestamp: new Date().toISOString()
         })
       })
+
+      // Start face recognition if enabled
+      if (faceRecognitionEnabled && localVideoRef.current) {
+        startFaceRecognition(meetingId)
+      }
     } catch (e) {
       console.error('Failed to mark attendance:', e)
     }
   }
+
+  function startFaceRecognition(meetingId) {
+    if (recognitionIntervalRef.current) {
+      clearInterval(recognitionIntervalRef.current)
+    }
+
+    recognitionIntervalRef.current = setInterval(async () => {
+      if (!localVideoRef.current || !recognitionCanvasRef.current) return
+
+      const video = localVideoRef.current
+      const canvas = recognitionCanvasRef.current
+
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0)
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return
+
+        const formData = new FormData()
+        formData.append('photo', blob, 'frame.jpg')
+
+        try {
+          const res = await fetch(apiUrl('/api/attendance/recognize'), {
+            method: 'POST',
+            body: formData
+          })
+          const data = await res.json()
+
+          if (data.recognized && data.match) {
+            // Update attendance with recognized user
+            await fetch(apiUrl('/api/edumeet/attendance/mark'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                meeting_id: meetingId,
+                user_name: data.match.name,
+                recognized: true,
+                confidence: data.match.similarity,
+                timestamp: new Date().toISOString()
+              })
+            })
+
+            // Update local attendance list
+            setAttendance(prev => {
+              const exists = prev.find(a => a.user_name === data.match.name)
+              if (!exists) {
+                return [...prev, {
+                  user_name: data.match.name,
+                  recognized: true,
+                  confidence: (data.match.similarity * 100).toFixed(0) + '%',
+                  timestamp: new Date().toISOString()
+                }]
+              }
+              return prev
+            })
+          }
+        } catch (e) {
+          console.error('Face recognition error:', e)
+        }
+      }, 'image/jpeg', 0.85)
+    }, 3000) // Check every 3 seconds
+  }
+
+  useEffect(() => {
+    return () => {
+      if (recognitionIntervalRef.current) {
+        clearInterval(recognitionIntervalRef.current)
+      }
+    }
+  }, [])
 
   function toggleVideo() {
     setIsVideoOn(!isVideoOn)
@@ -642,18 +760,28 @@ export default function Meet() {
             disabled={!meetingTitle.trim() || !userName.trim()}
             style={{
               padding: '16px',
-              background: meetingTitle.trim() && userName.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#ccc',
+              background: meetingTitle.trim() && userName.trim() 
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                : 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)',
               color: '#fff',
               border: 'none',
               borderRadius: 10,
               fontSize: 18,
               fontWeight: '600',
               cursor: meetingTitle.trim() && userName.trim() ? 'pointer' : 'not-allowed',
-              boxShadow: meetingTitle.trim() && userName.trim() ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
+              boxShadow: meetingTitle.trim() && userName.trim() ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none',
+              position: 'relative'
             }}
+            title={!userName.trim() ? 'Please enter your name on the home screen' : !meetingTitle.trim() ? 'Please enter a meeting title' : ''}
           >
-            Create Meeting & Start
+            {!userName.trim() ? '⚠️ Enter Your Name First' : !meetingTitle.trim() ? '⚠️ Enter Meeting Title' : 'Create Meeting & Start'}
           </button>
+          
+          {!userName.trim() && (
+            <p style={{ color: '#f44336', fontSize: 14, marginTop: 10, textAlign: 'center' }}>
+              ⚠️ Please go back and enter your name on the home screen
+            </p>
+          )}
         </div>
       </div>
     )
@@ -764,6 +892,10 @@ export default function Meet() {
                   playsInline
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
+                <canvas 
+                  ref={recognitionCanvasRef}
+                  style={{ display: 'none' }}
+                />
                 <div style={{ 
                   position: 'absolute', 
                   bottom: 10, 
@@ -776,6 +908,26 @@ export default function Meet() {
                 }}>
                   {userName} (You)
                 </div>
+                {faceRecognitionEnabled && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                    color: '#fff',
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    animation: 'pulse 2s infinite'
+                  }}>
+                    <span style={{ fontSize: 14 }}>🎯</span>
+                    Face Recognition Active
+                  </div>
+                )}
                 {!isVideoOn && (
                   <div style={{
                     position: 'absolute',
@@ -955,9 +1107,9 @@ export default function Meet() {
                       width: '100%',
                       padding: '10px',
                       background: '#4CAF50',
-                      color: '#fff',
+                      color: 'white',
                       border: 'none',
-                      borderRadius: 5,
+                      borderRadius: 8,
                       cursor: 'pointer',
                       fontWeight: '600'
                     }}
@@ -969,6 +1121,200 @@ export default function Meet() {
             </div>
           )}
 
+          {/* Smart Attendance Panel */}
+          {showAttendancePanel && (
+            <div style={{
+              position: 'absolute',
+              top: 70,
+              right: 20,
+              width: 400,
+              maxHeight: '80vh',
+              background: '#2a2a2a',
+              borderRadius: 12,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              zIndex: 100,
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{ padding: 15, borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ margin: 0, color: '#fff' }}>✅ Smart Attendance</h4>
+                <button
+                  onClick={() => setShowAttendancePanel(false)}
+                  style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{ padding: 15, background: '#333', borderBottom: '1px solid #444' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#fff', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={faceRecognitionEnabled}
+                    onChange={(e) => {
+                      setFaceRecognitionEnabled(e.target.checked)
+                      if (e.target.checked && currentMeeting) {
+                        startFaceRecognition(currentMeeting.id)
+                      } else if (recognitionIntervalRef.current) {
+                        clearInterval(recognitionIntervalRef.current)
+                      }
+                    }}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <span style={{ fontWeight: '600' }}>🎯 Enable Face Recognition</span>
+                </label>
+                <p style={{ margin: '8px 0 0 28px', fontSize: 12, color: '#999' }}>
+                  Automatically recognize enrolled users via camera
+                </p>
+              </div>
+
+              <div style={{ flex: 1, padding: 15, overflowY: 'auto' }}>
+                <h5 style={{ color: '#fff', marginTop: 0, marginBottom: 12 }}>Present ({attendance.length})</h5>
+                {attendance.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                    No attendance marked yet
+                  </div>
+                ) : (
+                  attendance.map((a, i) => (
+                    <div key={i} style={{ 
+                      padding: '12px 15px', 
+                      background: a.recognized ? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' : '#444', 
+                      borderRadius: 8, 
+                      marginBottom: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12
+                    }}>
+                      <div style={{ 
+                        fontSize: 24,
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: a.recognized ? '#fff' : '#555',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {a.recognized ? '✅' : '👤'}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>
+                          {a.user_name}
+                        </div>
+                        {a.recognized && (
+                          <div style={{ fontSize: 12, color: a.recognized ? '#fff' : '#aaa', opacity: 0.9 }}>
+                            🎯 Recognized ({a.confidence})
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: a.recognized ? '#fff' : '#999', opacity: 0.8, marginTop: 2 }}>
+                          {new Date(a.timestamp).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ padding: 15, borderTop: '1px solid #444', display: 'flex', gap: 10 }}>
+                <button
+                  onClick={downloadAttendance}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  📥 Download CSV
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(attendance.map(a => `${a.user_name} - ${new Date(a.timestamp).toLocaleString()}`).join('\\n'))
+                    alert('Attendance list copied!')
+                  }}
+                  style={{
+                    padding: '12px 20px',
+                    background: '#444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  📋
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Chat Panel */}
+          {showChat && (
+            <div style={{
+              width: 400,
+              background: '#2d2d2d',
+              borderLeft: '1px solid #444',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{ padding: 15, borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ margin: 0, color: '#fff' }}>Chat</h4>
+                <button
+                  onClick={() => setShowChat(false)}
+                  style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ flex: 1, padding: 15, overflowY: 'auto' }}>
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ marginBottom: 15 }}>
+                    <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{msg.user}</div>
+                    <div style={{ color: '#fff', background: '#444', padding: 10, borderRadius: 8 }}>
+                      {msg.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: 15, borderTop: '1px solid #444', display: 'flex', gap: 10 }}>
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && sendMessage()}
+                  placeholder="Type a message..."
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    background: '#444',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#fff'
+                  }}
+                />
+                <button
+                  onClick={sendMessage}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#667eea',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Whiteboard Panel */}
           {showWhiteboard && (
             <div style={{ 
               width: 600, 
@@ -1198,6 +1544,25 @@ export default function Meet() {
           >
             👥
           </button>
+
+          {currentMeeting.settings?.enable_attendance && (
+            <button
+              onClick={() => setShowAttendancePanel(!showAttendancePanel)}
+              style={{
+                padding: '15px 20px',
+                background: showAttendancePanel ? '#667eea' : '#444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 24,
+                minWidth: 60
+              }}
+              title="Smart Attendance"
+            >
+              ✅
+            </button>
+          )}
 
           {currentMeeting.settings?.enable_whiteboard && (
             <button

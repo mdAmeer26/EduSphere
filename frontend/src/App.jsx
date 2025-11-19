@@ -589,7 +589,7 @@ export default function App() {
             }}
             className="feature-grid">
               {tabs.slice(1).map(t => (
-                <div key={t.id} onClick={() => setTab(t.id)} style={{
+                <div key={t.id} style={{
                   background: 'rgba(255, 255, 255, 0.98)',
                   borderRadius: '18px',
                   padding: '24px',

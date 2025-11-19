@@ -1,49 +1,85 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { apiUrl } from '../lib/api'
 import Page from '../components/layout/Page'
-import Button from '../components/ui/Button'
-import { Field, Input } from '../components/ui/Field'
-import Dropzone from '../components/ui/Dropzone'
-import Loader from '../components/ui/Loader'
-import ErrorNote from '../components/ui/ErrorNote'
 
 export default function Attendance() {
-  const [name, setName] = useState('')
+  const [enrollName, setEnrollName] = useState('')
   const [enrollPhoto, setEnrollPhoto] = useState(null)
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [enrolledUsers, setEnrolledUsers] = useState([])
+  const [recognizedUser, setRecognizedUser] = useState(null)
+  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [autoMode, setAutoMode] = useState(false)
-  const [monthlyStats, setMonthlyStats] = useState(null)
-  const [analytics, setAnalytics] = useState(null)
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+  const overlayRef = useRef(null)
   const streamRef = useRef(null)
+  const scanIntervalRef = useRef(null)
+  const cameraContainerRef = useRef(null)
 
   useEffect(() => {
-    loadAnalytics()
-    loadMonthlyStats()
+    loadEnrolledUsers()
   }, [])
 
   useEffect(() => {
-    if (autoMode) {
+    if (scanning) {
       startCamera()
+      // Scroll camera into view
+      setTimeout(() => {
+        cameraContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
     } else {
       stopCamera()
     }
     return () => stopCamera()
-  }, [autoMode])
+  }, [scanning])
+
+  const loadEnrolledUsers = async () => {
+    try {
+      const res = await fetch(apiUrl('/api/attendance/enrolled'))
+      const data = await res.json()
+      if (data.ok) {
+        setEnrolledUsers(data.users || [])
+        console.log('Loaded users:', data.users)
+      }
+    } catch (e) {
+      console.error('Failed to load users:', e)
+    }
+  }
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+      console.log('Starting camera...')
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true,
+        audio: false
+      })
+      
+      console.log('Got stream:', stream)
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
+        
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded')
+          videoRef.current.play().then(() => {
+            console.log('Video playing')
+            setTimeout(() => {
+              scanIntervalRef.current = setInterval(() => {
+                captureAndRecognize()
+              }, 2000)
+            }, 1000)
+          }).catch(err => {
+            console.error('Play failed:', err)
+            setError('Failed to play video: ' + err.message)
+          })
+        }
       }
     } catch (e) {
-      setError('Camera access denied')
+      console.error('Camera error:', e)
+      setError('Camera access denied: ' + e.message)
     }
   }
 
@@ -52,15 +88,24 @@ export default function Attendance() {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+    setRecognizedUser(null)
+    clearOverlay()
   }
 
   const captureAndRecognize = async () => {
     if (!videoRef.current || !canvasRef.current) return
     
-    const canvas = canvasRef.current
     const video = videoRef.current
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
+    const canvas = canvasRef.current
+    
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+    
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
     
     const ctx = canvas.getContext('2d')
     ctx.drawImage(video, 0, 0)
@@ -68,204 +113,407 @@ export default function Attendance() {
     canvas.toBlob(async (blob) => {
       if (!blob) return
       
-      setLoading(true)
-      setError('')
-      const form = new FormData()
-      form.append('photo', blob, 'capture.jpg')
+      const formData = new FormData()
+      formData.append('photo', blob, 'frame.jpg')
       
       try {
-        const res = await fetch(apiUrl('/api/attendance/recognize'), { method: 'POST', body: form })
+        const res = await fetch(apiUrl('/api/attendance/recognize'), {
+          method: 'POST',
+          body: formData
+        })
         const data = await res.json()
         
-        if (data.recognized) {
-          setResult({
-            type: 'auto_recognition',
-            name: data.match.name,
-            similarity: data.match.similarity,
-            message: data.message,
-            attendance_marked: data.attendance_marked
+        if (data.recognized && data.match) {
+          const user = data.match
+          setRecognizedUser({
+            name: user.name,
+            confidence: (user.similarity * 100).toFixed(0)
           })
-          await loadAnalytics()
-          await loadMonthlyStats()
+          drawRecognizedFace(user.name, user.similarity)
+          
+          if (data.attendance_marked) {
+            setMessage(`✅ ${user.name} - Attendance Marked at ${new Date().toLocaleTimeString()}`)
+          }
+        } else {
+          setRecognizedUser(null)
+          drawScanningMessage()
         }
       } catch (e) {
-        setError(String(e))
-      } finally {
-        setLoading(false)
+        console.error('Recognition error:', e)
       }
-    }, 'image/jpeg', 0.9)
+    }, 'image/jpeg', 0.85)
   }
 
-  useEffect(() => {
-    if (autoMode && !loading) {
-      const interval = setInterval(() => {
-        captureAndRecognize()
-      }, 3000)
-      return () => clearInterval(interval)
-    }
-  }, [autoMode, loading])
+  const drawRecognizedFace = (name, similarity) => {
+    const overlay = overlayRef.current
+    const video = videoRef.current
+    if (!overlay || !video) return
+    
+    overlay.width = video.videoWidth
+    overlay.height = video.videoHeight
+    
+    const ctx = overlay.getContext('2d')
+    ctx.clearRect(0, 0, overlay.width, overlay.height)
+    
+    // Green border
+    ctx.strokeStyle = '#4CAF50'
+    ctx.lineWidth = 8
+    ctx.strokeRect(4, 4, overlay.width - 8, overlay.height - 8)
+    
+    // Name box at top
+    const centerX = overlay.width / 2
+    const topY = 60
+    
+    ctx.fillStyle = '#4CAF50'
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.shadowBlur = 20
+    ctx.beginPath()
+    ctx.roundRect(centerX - 140, topY - 45, 280, 75, 12)
+    ctx.fill()
+    ctx.shadowBlur = 0
+    
+    ctx.fillStyle = 'white'
+    ctx.font = 'bold 32px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText(name.toUpperCase(), centerX, topY - 10)
+    
+    ctx.font = 'bold 18px Arial'
+    ctx.fillText(`✓ ${(similarity * 100).toFixed(0)}% Match`, centerX, topY + 15)
+    
+    // Present box at bottom
+    ctx.fillStyle = '#4CAF50'
+    ctx.beginPath()
+    ctx.roundRect(centerX - 90, overlay.height - 100, 180, 55, 10)
+    ctx.fill()
+    
+    ctx.fillStyle = 'white'
+    ctx.font = 'bold 24px Arial'
+    ctx.fillText('✓ PRESENT', centerX, overlay.height - 70)
+  }
 
-  const enroll = async (e) => {
+  const drawScanningMessage = () => {
+    const overlay = overlayRef.current
+    if (!overlay) return
+    
+    const ctx = overlay.getContext('2d')
+    ctx.clearRect(0, 0, overlay.width, overlay.height)
+    
+    const centerX = overlay.width / 2
+    const centerY = overlay.height / 2
+    
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'
+    ctx.beginPath()
+    ctx.roundRect(centerX - 150, centerY - 40, 300, 80, 10)
+    ctx.fill()
+    
+    ctx.fillStyle = '#333'
+    ctx.font = 'bold 24px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('🔍 Scanning...', centerX, centerY)
+  }
+
+  const clearOverlay = () => {
+    const overlay = overlayRef.current
+    if (overlay) {
+      const ctx = overlay.getContext('2d')
+      ctx.clearRect(0, 0, overlay.width, overlay.height)
+    }
+  }
+
+  const handleEnroll = async (e) => {
     e.preventDefault()
-    if (!name.trim() || !enrollPhoto) return
+    if (!enrollName.trim() || !enrollPhoto) return
     
-    setLoading(true)
-    setResult(null)
     setError('')
-    const form = new FormData()
-    form.append('name', name)
-    form.append('photo', enrollPhoto)
+    setMessage('')
+    
+    const formData = new FormData()
+    formData.append('name', enrollName.trim())
+    formData.append('photo', enrollPhoto)
     
     try {
-      const res = await fetch(apiUrl('/api/attendance/enroll'), { method: 'POST', body: form })
+      const res = await fetch(apiUrl('/api/attendance/enroll'), {
+        method: 'POST',
+        body: formData
+      })
       const data = await res.json()
-      setResult({ type: 'enroll', data })
-      setName('')
-      setEnrollPhoto(null)
+      
+      if (data.ok) {
+        setMessage(`✅ ${data.enrolled.name} enrolled successfully!`)
+        setEnrollName('')
+        setEnrollPhoto(null)
+        await loadEnrolledUsers()
+      } else {
+        setError(data.error || 'Enrollment failed')
+      }
     } catch (e) {
-      setError(String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMonthlyStats = async () => {
-    try {
-      const res = await fetch(apiUrl('/api/attendance/monthly-stats'))
-      const data = await res.json()
-      setMonthlyStats(data)
-    } catch (e) {
-      console.error('Failed to load monthly stats:', e)
-    }
-  }
-
-  const loadAnalytics = async () => {
-    try {
-      const res = await fetch(apiUrl('/api/attendance/analytics'))
-      const data = await res.json()
-      setAnalytics(data)
-    } catch (e) {
-      console.error('Failed to load analytics:', e)
+      setError('Failed to enroll: ' + e.message)
     }
   }
 
   return (
-    <Page title="Smart Attendance - Auto Recognition" description="AI-powered facial recognition attendance">
+    <Page title="🎯 Smart Attendance" description="AI Facial Recognition Attendance System">
       
-      {/* Auto Recognition Mode */}
-      <div style={{ marginBottom: 24, padding: 20, background: 'var(--background-secondary)', borderRadius: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>🎥 Automatic Recognition</h3>
-          <Button onClick={() => setAutoMode(!autoMode)} style={{ background: autoMode ? '#f44336' : '#4CAF50' }}>
-            {autoMode ? '⏸ Stop' : '▶ Start Auto Mode'}
-          </Button>
-        </div>
-        {autoMode && (
-          <div style={{ position: 'relative' }}>
-            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxWidth: 640, borderRadius: 8, border: '3px solid #4CAF50' }} />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-            <div style={{ marginTop: 12, padding: 12, background: '#4CAF50', color: 'white', borderRadius: 6, textAlign: 'center' }}>
-              🔍 Scanning... Stand in front of camera to mark attendance!
-            </div>
+      {/* Stats */}
+      <div style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        padding: 32,
+        borderRadius: 16,
+        marginBottom: 24,
+        color: 'white',
+        boxShadow: '0 10px 40px rgba(102, 126, 234, 0.4)'
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, fontWeight: 700 }}>{enrolledUsers.length}</div>
+            <div style={{ fontSize: 15, opacity: 0.95 }}>👥 Enrolled Users</div>
           </div>
-        )}
-        {result && result.type === 'auto_recognition' && (
-          <div style={{ marginTop: 16, padding: 16, background: '#4CAF50', color: 'white', borderRadius: 8 }}>
-            <h4 style={{ margin: '0 0 8px 0' }}>✅ {result.message}</h4>
-            <p style={{ margin: 0 }}>Confidence: {(result.similarity * 100).toFixed(1)}%</p>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, fontWeight: 700 }}>
+              {recognizedUser ? '✓' : '—'}
+            </div>
+            <div style={{ fontSize: 15, opacity: 0.95 }}>🔍 Face Detection</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, fontWeight: 700 }}>
+              {scanning ? '🟢' : '🔴'}
+            </div>
+            <div style={{ fontSize: 15, opacity: 0.95 }}>📹 Camera Status</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Camera */}
+      <div 
+        ref={cameraContainerRef}
+        style={{ 
+        marginBottom: 24,
+        padding: 32,
+        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        borderRadius: 16,
+        boxShadow: '0 10px 40px rgba(240, 147, 251, 0.4)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', color: 'white', fontSize: 26, fontWeight: 700 }}>
+              📹 Live Face Recognition
+            </h3>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.95)', fontSize: 15 }}>
+              Automatic attendance with real-time face detection
+            </p>
+          </div>
+          <button 
+            onClick={() => setScanning(!scanning)}
+            style={{
+              background: scanning ? '#f44336' : '#4CAF50',
+              color: 'white',
+              border: 'none',
+              padding: '16px 32px',
+              borderRadius: 12,
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+            }}
+          >
+            {scanning ? '⏹ Stop Camera' : '▶ Start Recognition'}
+          </button>
+        </div>
+
+        {scanning && (
+          <div>
+            <div style={{ position: 'relative', background: '#000', borderRadius: 16, overflow: 'hidden' }}>
+              <video 
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  minHeight: 400,
+                  maxHeight: 500,
+                  display: 'block'
+                }}
+              />
+              <canvas 
+                ref={overlayRef}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+            
+            <div style={{
+              marginTop: 16,
+              padding: 20,
+              background: recognizedUser ? '#4CAF50' : 'rgba(255,255,255,0.95)',
+              color: recognizedUser ? 'white' : '#333',
+              borderRadius: 12,
+              textAlign: 'center',
+              fontSize: 17,
+              fontWeight: 700
+            }}>
+              {recognizedUser ? (
+                `✅ ${recognizedUser.name} DETECTED - ${recognizedUser.confidence}% Match - PRESENT`
+              ) : (
+                '🔍 Scanning for faces...'
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Enroll */}
-      <div style={{ marginBottom: 24, padding: 20, background: 'var(--background-secondary)', borderRadius: 12 }}>
-        <h3>👤 Enroll New Person</h3>
-        <form onSubmit={enroll} style={{ display: 'grid', gap: 12, maxWidth: 500 }}>
-          <Field label="Name"><Input placeholder="Enter name" value={name} onChange={e => setName(e.target.value)} /></Field>
-          <Dropzone accept="image/*" onFiles={(files) => setEnrollPhoto(files[0])}>
-            {enrollPhoto ? `Selected: ${enrollPhoto.name}` : 'Drop face photo'}
-          </Dropzone>
-          <Button type="submit" loading={loading} disabled={!name.trim() || !enrollPhoto}>Enroll</Button>
+      {/* Enroll Section */}
+      <div style={{
+        marginBottom: 24,
+        padding: 32,
+        background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+        borderRadius: 16,
+        boxShadow: '0 10px 40px rgba(168, 237, 234, 0.4)'
+      }}>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: 26, fontWeight: 700 }}>
+          ➕ Enroll New User
+        </h3>
+        <p style={{ margin: '0 0 24px 0', color: '#666', fontSize: 15 }}>
+          Register a person for automatic face recognition
+        </p>
+        
+        <form onSubmit={handleEnroll} style={{ maxWidth: 600 }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Full Name</label>
+            <input 
+              type="text"
+              placeholder="Enter full name"
+              value={enrollName}
+              onChange={e => setEnrollName(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 14,
+                fontSize: 16,
+                border: '2px solid #ddd',
+                borderRadius: 8
+              }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Face Photo</label>
+            <input 
+              type="file"
+              accept="image/*"
+              onChange={e => setEnrollPhoto(e.target.files[0])}
+              style={{
+                width: '100%',
+                padding: 14,
+                fontSize: 16,
+                border: '2px solid #ddd',
+                borderRadius: 8
+              }}
+            />
+          </div>
+          
+          <button 
+            type="submit"
+            disabled={!enrollName.trim() || !enrollPhoto}
+            style={{
+              width: '100%',
+              padding: 16,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: enrollName.trim() && enrollPhoto ? 'pointer' : 'not-allowed',
+              opacity: enrollName.trim() && enrollPhoto ? 1 : 0.5
+            }}
+          >
+            ✅ Enroll User
+          </button>
         </form>
       </div>
 
-      {/* Monthly Stats */}
-      {monthlyStats && monthlyStats.ok && (
-        <div style={{ marginBottom: 24, padding: 20, background: 'var(--background-secondary)', borderRadius: 12 }}>
-          <h3>📊 Monthly Report - {monthlyStats.month}/{monthlyStats.year}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
-            <div style={{ padding: 16, background: '#2196F3', color: 'white', borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 'bold' }}>{monthlyStats.total_records}</div>
-              <div>Total Records</div>
-            </div>
-            <div style={{ padding: 16, background: '#4CAF50', color: 'white', borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 'bold' }}>{monthlyStats.unique_people}</div>
-              <div>People</div>
-            </div>
-            <div style={{ padding: 16, background: '#FF9800', color: 'white', borderRadius: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 'bold' }}>{monthlyStats.average_attendance}</div>
-              <div>Avg</div>
-            </div>
-          </div>
-          <div style={{ padding: 20, background: '#4CAF50', color: 'white', borderRadius: 8, marginBottom: 20 }}>
-            <h4 style={{ margin: '0 0 8px 0' }}>🏆 Most Present: {monthlyStats.most_present.name}</h4>
-            <p style={{ margin: 0, fontSize: 24 }}>Days: {monthlyStats.most_present.count}</p>
-          </div>
-          {/* Bar Chart */}
-          <div style={{ background: 'white', padding: 20, borderRadius: 8 }}>
-            <h4 style={{ margin: '0 0 16px 0', color: '#333' }}>Attendance by Person</h4>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 250 }}>
-              {monthlyStats.graph_data.labels.map((label, idx) => {
-                const value = monthlyStats.graph_data.values[idx]
-                const maxValue = Math.max(...monthlyStats.graph_data.values)
-                const height = (value / maxValue) * 100
-                const color = monthlyStats.graph_data.colors[idx % monthlyStats.graph_data.colors.length]
-                return (
-                  <div key={idx} style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ height: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                      <div style={{ width: '100%', height: `${height}%`, background: color, borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8, color: 'white', fontWeight: 'bold' }}>
-                        {value}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#666', wordBreak: 'break-word' }}>{label}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Analytics */}
-      {analytics && analytics.ok && (
-        <div style={{ padding: 20, background: 'var(--background-secondary)', borderRadius: 12 }}>
-          <h3>📈 Analytics</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-            <div style={{ padding: 16, background: '#673AB7', color: 'white', borderRadius: 8 }}>
-              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{analytics.enrolled_faces}</div>
-              <div>Enrolled</div>
-            </div>
-            <div style={{ padding: 16, background: '#00BCD4', color: 'white', borderRadius: 8 }}>
-              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{analytics.automatic_checkins}</div>
-              <div>Auto Check-ins</div>
-            </div>
-            <div style={{ padding: 16, background: '#E91E63', color: 'white', borderRadius: 8 }}>
-              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{analytics.manual_checkins}</div>
-              <div>Manual</div>
-            </div>
-            <div style={{ padding: 16, background: '#FFEB3B', color: '#333', borderRadius: 8 }}>
-              <div style={{ fontSize: 24, fontWeight: 'bold' }}>{analytics.recent_activity}</div>
-              <div>Recent (7d)</div>
-            </div>
+      {/* Enrolled Users */}
+      {enrolledUsers.length > 0 && (
+        <div style={{
+          padding: 32,
+          background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+          borderRadius: 16,
+          boxShadow: '0 10px 40px rgba(255, 236, 210, 0.4)'
+        }}>
+          <h3 style={{ margin: '0 0 24px 0', fontSize: 26, fontWeight: 700 }}>
+            👥 Enrolled Users ({enrolledUsers.length})
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+            {enrolledUsers.map((user, i) => (
+              <div 
+                key={i}
+                style={{
+                  padding: 20,
+                  background: 'white',
+                  borderRadius: 12,
+                  textAlign: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}
+              >
+                <div style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '50%',
+                  background: '#667eea',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 36,
+                  fontWeight: 700,
+                  margin: '0 auto 12px'
+                }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{user.name}</div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                  ID: {user.id.substring(0, 8)}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {loading && !autoMode && <div style={{ marginTop: 12 }}><Loader label="Processing..." /></div>}
-      {error && <div style={{ marginTop: 12 }}><ErrorNote message={error} /></div>}
-      {result && result.type === 'enroll' && (
-        <div style={{ marginTop: 12, padding: 16, background: '#4CAF50', color: 'white', borderRadius: 8 }}>
-          ✅ Enrolled: {result.data.enrolled?.name}
+      {/* Messages */}
+      {message && (
+        <div style={{
+          marginTop: 16,
+          padding: 16,
+          background: '#4CAF50',
+          color: 'white',
+          borderRadius: 12,
+          fontSize: 16,
+          fontWeight: 600
+        }}>
+          {message}
+        </div>
+      )}
+      
+      {error && (
+        <div style={{
+          marginTop: 16,
+          padding: 16,
+          background: '#f44336',
+          color: 'white',
+          borderRadius: 12,
+          fontSize: 16,
+          fontWeight: 600
+        }}>
+          ❌ {error}
         </div>
       )}
     </Page>

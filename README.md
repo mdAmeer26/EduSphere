@@ -42,6 +42,7 @@
 ### 🎨 Creation & Design
 - **EduVI** – AI image/video generation
 - **EduAir** – Air canvas with gesture recognition
+  - Most advanced finger tracking: predictive smoothing, anti-jitter filtering, velocity-based line width, and dynamic pointer feedback for natural air writing
 - **Circuit** – Electronic circuit design and simulation
 
 ### 📚 Additional Tools

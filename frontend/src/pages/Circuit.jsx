@@ -302,10 +302,35 @@ export default function Circuit() {
     let newConns = []
     let baseX = 400, baseY = 300
     let arduinoId = null
-    
+
+    // If prompt requests advanced/complex circuit, add all advanced components
+    if (prompt.includes('advanced component') || prompt.includes('advanced circuit') || prompt.includes('complex circuit') || prompt.includes('all advanced')) {
+      const advLibs = [
+        { type: 'inductor', icon: '🧲', label: 'Inductor', value: '10mH', color: '#f97316' },
+        { type: 'diode', icon: '◄', label: 'Diode', value: '1N4007', color: '#ec4899' },
+        { type: 'transistor', icon: '🔺', label: 'Transistor', value: '2N2222', color: '#d946ef' },
+        { type: 'op_amp', icon: '△', label: 'Op-Amp', value: '741', color: '#a855f7' },
+        { type: 'mosfet', icon: '▭', label: 'MOSFET', value: 'IRF540', color: '#8b5cf6' }
+      ];
+      let advX = baseX - 200;
+      let advY = baseY - 100;
+      advLibs.forEach((lib, i) => {
+        newComps.push({
+          id: Date.now() + i,
+          ...lib,
+          x: advX + (i * 90),
+          y: advY + (i % 2 === 0 ? 0 : 100)
+        });
+      });
+      // Optionally, connect them in series for a demo design
+      for (let i = 0; i < advLibs.length - 1; i++) {
+        newConns.push({ from: Date.now() + i, to: Date.now() + i + 1 });
+      }
+    }
+
     // ALWAYS add Arduino Uno as the brain
     if (prompt.includes('arduino') || prompt.includes('circuit')) {
-      arduinoId = Date.now()
+      arduinoId = Date.now() + 1000;
       newComps.push({
         id: arduinoId,
         type: 'arduino_uno',

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { apiUrl } from '../lib/api'
 import Page from '../components/layout/Page'
 import Button from '../components/ui/Button'
 import Loader from '../components/ui/Loader'
@@ -7,6 +8,8 @@ export default function Air() {
   const [isActive, setIsActive] = useState(false)
   const [status, setStatus] = useState('Click Start to begin')
   const [gesture, setGesture] = useState('')
+  const [mode, setMode] = useState('idle') // idle, move, draw, erase, analyze
+  const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
   const [scriptsLoaded, setScriptsLoaded] = useState(false)
   
@@ -17,10 +20,11 @@ export default function Air() {
   const cameraRef = useRef(null)
   const streamRef = useRef(null)
   const lastPositionRef = useRef(null)
+  const pointerTrailRef = useRef([]) // For pointer trail
 
   // Load MediaPipe scripts
   useEffect(() => {
-    if (window.Hands && window.Camera) {
+    if (window.Hands && window.Camera && window.drawConnectors && window.drawLandmarks && window.HAND_CONNECTIONS) {
       setScriptsLoaded(true)
       setStatus('Ready to start')
       return
@@ -29,25 +33,44 @@ export default function Air() {
     const script1 = document.createElement('script')
     script1.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'
     script1.crossOrigin = 'anonymous'
-    
+
     const script2 = document.createElement('script')
     script2.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js'
     script2.crossOrigin = 'anonymous'
 
-    script2.onload = () => {
-      setScriptsLoaded(true)
-      setStatus('Ready to start')
+    const script3 = document.createElement('script')
+    script3.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js'
+    script3.crossOrigin = 'anonymous'
+
+    let loadedCount = 0
+    const trySetLoaded = () => {
+      loadedCount++
+      if (
+        window.Hands && window.Camera &&
+        window.drawConnectors && window.drawLandmarks && window.HAND_CONNECTIONS &&
+        loadedCount >= 3
+      ) {
+        setScriptsLoaded(true)
+        setStatus('Ready to start')
+      }
     }
+
+    script1.onload = trySetLoaded
+    script2.onload = trySetLoaded
+    script3.onload = trySetLoaded
 
     script1.onerror = () => setStatus('Error loading MediaPipe')
     script2.onerror = () => setStatus('Error loading MediaPipe')
+    script3.onerror = () => setStatus('Error loading MediaPipe')
 
     document.body.appendChild(script1)
     document.body.appendChild(script2)
+    document.body.appendChild(script3)
 
     return () => {
       if (document.body.contains(script1)) document.body.removeChild(script1)
       if (document.body.contains(script2)) document.body.removeChild(script2)
+      if (document.body.contains(script3)) document.body.removeChild(script3)
       stopCamera()
     }
   }, [])
@@ -157,68 +180,154 @@ export default function Air() {
     lastPositionRef.current = null
   }
 
-  const onHandResults = (results) => {
-    const canvas = canvasRef.current
-    const drawCanvas = drawCanvasRef.current
-    if (!canvas || !drawCanvas) return
 
-    const ctx = canvas.getContext('2d')
-    const drawCtx = drawCanvas.getContext('2d')
+  const onHandResults = (results) => {
+    const canvas = canvasRef.current;
+    const drawCanvas = drawCanvasRef.current;
+    if (!canvas || !drawCanvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const drawCtx = drawCanvas.getContext('2d');
 
     // Clear and draw video frame
-    ctx.save()
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height)
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+    // Draw pointer trail (fading)
+    if (pointerTrailRef.current.length > 1) {
+      for (let i = 1; i < pointerTrailRef.current.length; i++) {
+        const prev = pointerTrailRef.current[i - 1];
+        const curr = pointerTrailRef.current[i];
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.strokeStyle = `rgba(102,126,234,${0.2 + 0.6 * (i / pointerTrailRef.current.length)})`;
+        ctx.lineWidth = 8 * (i / pointerTrailRef.current.length);
+        ctx.stroke();
+      }
+    }
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-      const landmarks = results.multiHandLandmarks[0]
+      const landmarks = results.multiHandLandmarks[0];
 
       // Draw hand landmarks
       if (window.drawConnectors && window.HAND_CONNECTIONS) {
         window.drawConnectors(ctx, landmarks, window.HAND_CONNECTIONS, {
           color: '#00FF00',
           lineWidth: 2
-        })
+        });
       }
       if (window.drawLandmarks) {
         window.drawLandmarks(ctx, landmarks, {
           color: '#FF0000',
           lineWidth: 1,
           radius: 3
-        })
+        });
       }
 
       // Count fingers
-      const fingers = countFingers(landmarks)
-      setGesture(`${fingers} finger${fingers !== 1 ? 's' : ''}`)
+      const fingers = countFingers(landmarks);
+      setGesture(`${fingers} finger${fingers !== 1 ? 's' : ''}`);
 
-      // Index finger tip for drawing (landmark 8)
-      const indexTip = landmarks[8]
-      const x = indexTip.x * canvas.width
-      const y = indexTip.y * canvas.height
+      // Index finger tip for pointer (landmark 8)
+      const indexTip = landmarks[8];
+      const x = indexTip.x * canvas.width;
+      const y = indexTip.y * canvas.height;
 
-      // Draw only when index finger is up (1 finger)
+      // Update pointer trail
+      pointerTrailRef.current.push({ x, y });
+      if (pointerTrailRef.current.length > 10) pointerTrailRef.current.shift();
+
+      // Draw pointer dot
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, 2 * Math.PI);
+      ctx.fillStyle = '#667eea';
+      ctx.globalAlpha = 0.7;
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+
+      // Mode switching (new mapping)
       if (fingers === 1) {
+        setMode('draw');
         if (lastPositionRef.current) {
-          drawCtx.strokeStyle = '#000'
-          drawCtx.lineWidth = 4
-          drawCtx.lineCap = 'round'
-          drawCtx.lineJoin = 'round'
-          drawCtx.beginPath()
-          drawCtx.moveTo(lastPositionRef.current.x, lastPositionRef.current.y)
-          drawCtx.lineTo(x, y)
-          drawCtx.stroke()
+          // Line smoothing: interpolate between last and current
+          const steps = 6;
+          for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const ix = lastPositionRef.current.x + (x - lastPositionRef.current.x) * t;
+            const iy = lastPositionRef.current.y + (y - lastPositionRef.current.y) * t;
+            drawCtx.save();
+            drawCtx.setTransform(-1, 0, 0, 1, drawCanvas.width, 0); // Mirror horizontally
+            drawCtx.strokeStyle = '#000';
+            drawCtx.lineWidth = 4;
+            drawCtx.lineCap = 'round';
+            drawCtx.lineJoin = 'round';
+            drawCtx.beginPath();
+            drawCtx.moveTo(drawCanvas.width - lastPositionRef.current.x, lastPositionRef.current.y);
+            drawCtx.lineTo(drawCanvas.width - ix, iy);
+            drawCtx.stroke();
+            drawCtx.restore();
+            lastPositionRef.current = { x: ix, y: iy };
+          }
         }
-        lastPositionRef.current = { x, y }
+        lastPositionRef.current = { x, y };
+      } else if (fingers === 2) {
+        setMode('move');
+        lastPositionRef.current = { x, y };
+      } else if (fingers === 3) {
+        setMode('erase');
+        drawCtx.save();
+        drawCtx.setTransform(-1, 0, 0, 1, drawCanvas.width, 0); // Mirror horizontally
+        drawCtx.globalCompositeOperation = 'destination-out';
+        drawCtx.beginPath();
+        drawCtx.arc(drawCanvas.width - x, y, 30, 0, 2 * Math.PI);
+        drawCtx.fill();
+        drawCtx.restore();
+        lastPositionRef.current = { x, y };
+      } else if (fingers === 4) {
+        setMode('analyze');
+        analyzeDrawingBackend(drawCanvas);
+        lastPositionRef.current = null;
+      } else if (fingers === 5) {
+        setMode('clear');
+        clearDrawing();
+        lastPositionRef.current = null;
       } else {
-        lastPositionRef.current = null
+        setMode('idle');
+        lastPositionRef.current = null;
+      }
+
+      // Send drawing to backend for OCR and analysis
+      async function analyzeDrawingBackend(drawCanvas) {
+        setAnswer('Solving...');
+        try {
+          const imageData = drawCanvas.toDataURL('image/png');
+          const res = await fetch(apiUrl('/api/eduair/analyze'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ strokes: [], imageData })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            setAnswer(`Answer: ${data.answer}`);
+          } else {
+            setAnswer('Unable to analyze');
+          }
+        } catch (e) {
+          setAnswer('Error analyzing drawing');
+        }
       }
     } else {
-      setGesture('')
-      lastPositionRef.current = null
+      setGesture('');
+      lastPositionRef.current = null;
+      pointerTrailRef.current = [];
     }
 
-    ctx.restore()
+    ctx.restore();
   }
 
   const countFingers = (landmarks) => {
@@ -300,7 +409,8 @@ export default function Air() {
           color: isActive ? '#10b981' : '#64748b'
         }}>
           {loading ? <Loader /> : status}
-          {gesture && <div style={{ marginTop: 8, color: '#667eea' }}>👆 {gesture}</div>}
+          {gesture && <div style={{ marginTop: 8, color: '#667eea' }}>✋ {gesture} | Mode: {mode}</div>}
+          {mode === 'analyze' && answer && <div style={{ marginTop: 12, color: '#f59e42', fontSize: 22 }}>{answer}</div>}
         </div>
 
         {/* Canvas Area */}
@@ -320,7 +430,13 @@ export default function Air() {
             playsInline
             muted
             style={{
-              display: 'none'
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 0,
+              pointerEvents: 'none',
+              zIndex: 0
             }}
           />
 
@@ -439,37 +555,60 @@ export default function Air() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
             gap: 16
           }}>
-            <div style={{ padding: 16, background: 'var(--background)', borderRadius: 12 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📹</div>
-              <h4 style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>1. Start Camera</h4>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Click "Start Camera" and allow camera access
-              </p>
-            </div>
-            
-            <div style={{ padding: 16, background: 'var(--background)', borderRadius: 12 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>✋</div>
-              <h4 style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>2. Show Your Hand</h4>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Position your hand clearly in front of the camera
-              </p>
-            </div>
-            
-            <div style={{ padding: 16, background: 'var(--background)', borderRadius: 12 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>👆</div>
-              <h4 style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>3. Draw with 1 Finger</h4>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Point with your index finger to draw on the canvas
-              </p>
-            </div>
-            
-            <div style={{ padding: 16, background: 'var(--background)', borderRadius: 12 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>✌️</div>
-              <h4 style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 4 }}>4. Stop Drawing</h4>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Show 2+ fingers or close your hand to stop drawing
-              </p>
-            </div>
+            {/* Card styles updated for better contrast and vibrancy */}
+            {[
+              {
+                icon: '📹',
+                title: '1. Start Camera',
+                desc: 'Click "Start Camera" and allow camera access'
+              },
+              {
+                icon: '🖐️',
+                title: '2. Show Your Hand',
+                desc: 'Position your hand clearly in front of the camera'
+              },
+              {
+                icon: '🫱',
+                title: '3. Draw (1 finger)',
+                desc: 'Point with your index finger to draw on the canvas'
+              },
+              {
+                icon: '✌️',
+                title: '4. Move (2 fingers)',
+                desc: 'Move your hand with 2 fingers up to reposition pointer'
+              },
+              {
+                icon: '🤟',
+                title: '5. Erase (3 fingers)',
+                desc: 'Show 3 fingers to erase at the pointer'
+              },
+              {
+                icon: '🖐️',
+                title: '6. Analyze (4 fingers)',
+                desc: 'Show 4 fingers to analyze your drawing (math/GK)'
+              },
+              {
+                icon: '🖐️',
+                title: '7. Clear Canvas (5 fingers)',
+                desc: 'Show all 5 fingers to clear the canvas'
+              }
+            ].map((item, idx) => (
+              <div key={idx} style={{
+                padding: 20,
+                background: '#181111',
+                borderRadius: 18,
+                boxShadow: '0 2px 12px 0 rgba(0,0,0,0.18)',
+                color: '#fff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                minHeight: 140
+              }}>
+                <div style={{ fontSize: 38, marginBottom: 10 }}>{item.icon}</div>
+                <h4 style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 6, color: '#fff' }}>{item.title}</h4>
+                <p style={{ fontSize: 15, color: '#e0bfae', margin: 0 }}>{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
 

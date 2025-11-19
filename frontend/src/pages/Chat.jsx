@@ -114,9 +114,6 @@ export default function Chat() {
           timestamp: new Date().toISOString(),
           messageId: data.message_id,
           contextDetected: data.context_detected,
-          suggestedFollowups: data.suggested_followups,
-          educationalResources: data.educational_resources,
-          confidenceScore: data.confidence_score,
           learningInsights: data.learning_insights
         }
         
@@ -187,7 +184,7 @@ export default function Chat() {
     >
       <div style={{ 
         display: 'flex', 
-        gap: '20px', 
+        gap: '0px', 
         height: 'calc(100vh - 200px)', 
         minHeight: '600px' 
       }}>
@@ -342,71 +339,7 @@ export default function Chat() {
                   </div>
                 </div>
 
-                {/* Enhanced Features Display */}
-                {msg.suggestedFollowups && msg.suggestedFollowups.length > 0 && (
-                  <div style={{ marginLeft: '0px', marginTop: '8px' }}>
-                    <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>
-                      💡 Suggested questions:
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {msg.suggestedFollowups.slice(0, 3).map((question, qIdx) => (
-                        <button
-                          key={qIdx}
-                          onClick={() => handleFollowUp(question)}
-                          style={{
-                            padding: '8px 14px',
-                            fontSize: '13px',
-                            background: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '20px',
-                            color: '#374151',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            fontWeight: '500'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.background = '#f3f4f6'
-                            e.target.style.borderColor = '#d1d5db'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.background = '#ffffff'
-                            e.target.style.borderColor = '#e5e7eb'
-                          }}
-                        >
-                          {question}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {msg.educationalResources && msg.educationalResources.length > 0 && (
-                  <div style={{ marginLeft: '0px', marginTop: '8px' }}>
-                    <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>
-                      📖 Resources:
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {msg.educationalResources.map((resource, rIdx) => (
-                        <div key={rIdx} style={{
-                          padding: '10px 12px',
-                          background: '#f9fafb',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          border: '1px solid #e5e7eb',
-                          color: '#374151'
-                        }}>
-                          <strong style={{ color: '#111827' }}>{resource.type}:</strong> {resource.title} - {resource.description}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {msg.confidenceScore && (
-                  <div style={{ marginLeft: '0px', marginTop: '6px', fontSize: '12px', color: '#9ca3af' }}>
-                    🎯 Confidence: {Math.round(msg.confidenceScore * 100)}%
-                  </div>
-                )}
               </div>
             ))}
 
@@ -481,81 +414,6 @@ export default function Chat() {
               textAlign: 'center'
             }}>
               Press Enter to send • Shift+Enter for new line
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar - Session Info & Capabilities */}
-        <div style={{
-          width: '300px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
-        }}>
-          {/* Session Summary */}
-          {sessionSummary && (
-            <div style={{
-              background: '#ffffff',
-              padding: '16px',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-            }}>
-              <h4 style={{ margin: '0 0 12px 0', color: '#3b82f6', fontSize: '16px', fontWeight: '600' }}>📊 Learning Session</h4>
-              <div style={{ fontSize: '13px', lineHeight: '1.8', color: '#374151' }}>
-                <div><strong style={{ color: '#111827' }}>Messages:</strong> {sessionSummary.session_duration}</div>
-                <div><strong style={{ color: '#111827' }}>Subjects:</strong> {sessionSummary.subjects_covered?.join(', ') || 'General'}</div>
-                <div><strong style={{ color: '#111827' }}>Progress:</strong> {sessionSummary.learning_progression}</div>
-                <div><strong style={{ color: '#111827' }}>Pace:</strong> {sessionSummary.recommended_pace}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Capabilities */}
-          {capabilities && (
-            <div style={{
-              background: '#ffffff',
-              padding: '16px',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-            }}>
-              <h4 style={{ margin: '0 0 12px 0', color: '#3b82f6', fontSize: '16px', fontWeight: '600' }}>✨ Features</h4>
-              <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#374151' }}>
-                <div style={{ marginBottom: '10px' }}>
-                  <strong style={{ color: '#111827' }}>Learning Support:</strong>
-                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px' }}>
-                    <li>Instant answers to any question</li>
-                    <li>Adaptive learning styles</li>
-                    <li>Progress tracking</li>
-                  </ul>
-                </div>
-                <div style={{ marginBottom: '10px' }}>
-                  <strong style={{ color: '#111827' }}>Subject Coverage:</strong>
-                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px' }}>
-                    <li>Mathematics & Science</li>
-                    <li>Programming & Technology</li>
-                    <li>History & Language Arts</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Quick Tips */}
-          <div style={{
-            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-            padding: '16px',
-            borderRadius: '12px',
-            color: '#1e40af',
-            border: '1px solid #93c5fd'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>💡 Tips</h4>
-            <div style={{ fontSize: '13px', lineHeight: '1.6' }}>
-              • Ask specific questions for better answers<br/>
-              • Use settings to personalize your experience<br/>
-              • Try different difficulty levels<br/>
-              • Explore suggested follow-up questions
             </div>
           </div>
         </div>

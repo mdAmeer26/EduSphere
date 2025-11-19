@@ -240,7 +240,7 @@ export default function Tutor() {
   }, [view])
 
   return (
-    <Page title="EduTutor - Affordable Tutoring" description="Find expert tutors at minimal fees for online and offline sessions">
+    <Page title="👨‍🏫 EduTutor Platform" description="Connect with verified expert tutors for personalized 1-on-1 learning at affordable rates">
       <div style={{ display: 'flex', gap: 24 }}>
         {/* Sidebar */}
         <div style={{ width: 260, flexShrink: 0 }}>
@@ -248,7 +248,7 @@ export default function Tutor() {
             {/* Stats Card */}
             {stats && (
               <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #20E2D7 0%, #00C9FF 100%)',
                 color: 'white',
                 borderRadius: 12,
                 padding: 20,
@@ -266,7 +266,7 @@ export default function Tutor() {
             )}
 
             {/* Navigation */}
-            <div style={{ background: 'var(--background-secondary)', borderRadius: 12, padding: 8, marginBottom: 16 }}>
+            <div style={{ background: '#FAF5F6', borderRadius: 12, padding: 8, marginBottom: 16 }}>
               {[
                 { id: 'browse', icon: '🔍', label: 'Browse Tutors' },
                 { id: 'sessions', icon: '📅', label: 'My Sessions' },
@@ -321,7 +321,7 @@ export default function Tutor() {
 
               {/* Search & Filters */}
               <div style={{
-                background: 'var(--background-secondary)',
+                background: '#FAF5F6',
                 borderRadius: 12,
                 padding: 20,
                 marginBottom: 20
@@ -409,7 +409,7 @@ export default function Tutor() {
                     <div
                       key={tutor.id}
                       style={{
-                        background: 'var(--background-secondary)',
+                        background: '#FAF5F6',
                         borderRadius: 12,
                         padding: 20,
                         cursor: 'pointer',
@@ -425,7 +425,7 @@ export default function Tutor() {
                           width: 80,
                           height: 80,
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          background: 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -442,8 +442,8 @@ export default function Tutor() {
                             {tutor.badges?.map((badge, i) => (
                               <span key={i} style={{
                                 padding: '4px 10px',
-                                background: '#e0e7ff',
-                                color: '#667eea',
+                                background: '#F2DFE1',
+                                color: '#732E4A',
                                 borderRadius: 12,
                                 fontSize: 12,
                                 fontWeight: 600
@@ -498,13 +498,13 @@ export default function Tutor() {
                 ← Back to Tutors
               </Button>
 
-              <div style={{ background: 'var(--background-secondary)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
+              <div style={{ background: '#FAF5F6', borderRadius: 12, padding: 24, marginBottom: 20 }}>
                 <div style={{ display: 'flex', gap: 20, marginBottom: 24 }}>
                   <div style={{
                     width: 100,
                     height: 100,
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, #20E2D7 0%, #00C9FF 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -520,8 +520,8 @@ export default function Tutor() {
                       {selectedTutor.badges?.map((badge, i) => (
                         <span key={i} style={{
                           padding: '6px 12px',
-                          background: '#e0e7ff',
-                          color: '#667eea',
+                          background: '#F2DFE1',
+                          color: '#732E4A',
                           borderRadius: 12,
                           fontSize: 13,
                           fontWeight: 600
@@ -561,25 +561,25 @@ export default function Tutor() {
                     borderRadius: 8
                   }}>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: '#732E4A' }}>
                         {selectedTutor.stats.total_sessions}
                       </div>
                       <div style={{ fontSize: 13, color: '#666' }}>Total Sessions</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: '#732E4A' }}>
                         {selectedTutor.rating}⭐
                       </div>
                       <div style={{ fontSize: 13, color: '#666' }}>Rating</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: '#732E4A' }}>
                         {selectedTutor.stats.response_rate}
                       </div>
                       <div style={{ fontSize: 13, color: '#666' }}>Response Rate</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: '#732E4A' }}>
                         {selectedTutor.response_time}
                       </div>
                       <div style={{ fontSize: 13, color: '#666' }}>Response Time</div>
@@ -731,7 +731,7 @@ export default function Tutor() {
                 <div style={{ display: 'grid', gap: 16 }}>
                   {sessions.map(session => (
                     <div key={session.id} style={{
-                      background: 'var(--background-secondary)',
+                      background: '#FAF5F6',
                       borderRadius: 12,
                       padding: 20
                     }}>

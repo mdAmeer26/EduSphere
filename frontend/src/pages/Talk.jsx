@@ -6,6 +6,7 @@ export default function Talk() {
   const [view, setView] = useState('chats') // chats, contacts, settings
   const [userName, setUserName] = useState(localStorage.getItem('eduTalkUserName') || '')
   const [userAvatar, setUserAvatar] = useState(localStorage.getItem('eduTalkUserAvatar') || '👤')
+  const [isNameConfirmed, setIsNameConfirmed] = useState(!!localStorage.getItem('eduTalkUserName'))
   
   // Chats & Groups
   const [chats, setChats] = useState([])
@@ -48,16 +49,44 @@ export default function Talk() {
   
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
+
+  // Content Moderation
+  const inappropriateWords = [
+    'fuck', 'shit', 'bitch', 'asshole', 'damn', 'hell', 'crap', 'bastard',
+    'dick', 'pussy', 'cock', 'ass', 'piss', 'slut', 'whore', 'fag',
+    'retard', 'stupid', 'idiot', 'dumb', 'kill', 'die', 'hate', 'loser'
+  ]
+
+  function moderateContent(text) {
+    if (!text || typeof text !== 'string') return { isClean: true, cleaned: text }
+    
+    let cleaned = text
+    let foundInappropriate = false
+    
+    inappropriateWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi')
+      if (regex.test(cleaned)) {
+        foundInappropriate = true
+        cleaned = cleaned.replace(regex, '*'.repeat(word.length))
+      }
+    })
+    
+    return {
+      isClean: !foundInappropriate,
+      cleaned: cleaned,
+      original: text
+    }
+  }
   const audioRef = useRef(null)
 
   useEffect(() => {
-    if (userName) {
+    if (isNameConfirmed && userName) {
       loadChats()
       loadContacts()
       loadGroups()
       loadChannels()
     }
-  }, [userName])
+  }, [isNameConfirmed, userName])
 
   useEffect(() => {
     if (activeChat) {
@@ -130,14 +159,27 @@ export default function Talk() {
     const messageContent = content || newMessage.trim()
     if (!messageContent && type === 'text') return
 
+    // Content moderation for text messages
+    let moderatedContent = messageContent
+    let isBlocked = false
+
+    if (type === 'text') {
+      const moderation = moderateContent(messageContent)
+      if (!moderation.isClean) {
+        alert('⚠️ Your message contains inappropriate language and has been filtered.\n\nPlease keep EduTalk respectful and safe for everyone.')
+        moderatedContent = moderation.cleaned
+      }
+    }
+
     const message = {
       id: Date.now(),
       sender: userName,
       senderAvatar: userAvatar,
-      content: messageContent,
+      content: moderatedContent,
       type: type, // text, image, file, voice, video
       timestamp: new Date().toISOString(),
-      status: 'sent' // sent, delivered, read
+      status: 'sent', // sent, delivered, read
+      moderated: moderatedContent !== messageContent
     }
 
     setMessages([...messages, message])
@@ -309,14 +351,14 @@ export default function Talk() {
 
   const emojis = ['😀', '😂', '😍', '😎', '🤔', '😮', '😢', '😡', '👍', '👏', '🙏', '❤️', '🔥', '⭐', '🎉', '✅']
 
-  if (!userName) {
+  if (!isNameConfirmed) {
     return (
       <div style={{ 
         height: '100vh', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)',
         fontFamily: 'system-ui'
       }}>
         <div style={{
@@ -341,6 +383,7 @@ export default function Talk() {
               if (e.key === 'Enter' && userName.trim()) {
                 localStorage.setItem('eduTalkUserName', userName.trim())
                 setUserName(userName.trim())
+                setIsNameConfirmed(true)
               }
             }}
             style={{
@@ -358,13 +401,14 @@ export default function Talk() {
               if (userName.trim()) {
                 localStorage.setItem('eduTalkUserName', userName.trim())
                 setUserName(userName.trim())
+                setIsNameConfirmed(true)
               }
             }}
             disabled={!userName.trim()}
             style={{
               width: '100%',
               padding: 15,
-              background: userName.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#ccc',
+              background: userName.trim() ? 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)' : '#ccc',
               color: '#fff',
               border: 'none',
               borderRadius: 10,
@@ -402,7 +446,7 @@ export default function Talk() {
         {/* Header */}
         <div style={{ 
           padding: 20, 
-          background: '#00a884',
+          background: '#732E4A',
           color: '#fff'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
@@ -549,7 +593,7 @@ export default function Talk() {
                   </div>
                   {chat.unread > 0 && (
                     <div style={{
-                      background: '#00a884',
+                      background: '#732E4A',
                       color: '#fff',
                       borderRadius: 50,
                       minWidth: 20,
@@ -650,7 +694,7 @@ export default function Talk() {
                     <div style={{
                       width: 12,
                       height: 12,
-                      background: '#00a884',
+                      background: '#732E4A',
                       borderRadius: 50,
                       border: '2px solid #fff'
                     }} />
@@ -671,7 +715,7 @@ export default function Talk() {
       </div>
 
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#efeae2' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#FAF5F6' }}>
         {!activeChat ? (
           <div style={{ 
             flex: 1, 
@@ -689,7 +733,7 @@ export default function Talk() {
                 onClick={() => setShowNewChat(true)}
                 style={{
                   padding: '12px 24px',
-                  background: '#00a884',
+                  background: '#732E4A',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 10,
@@ -704,7 +748,7 @@ export default function Talk() {
                 onClick={() => setShowNewGroup(true)}
                 style={{
                   padding: '12px 24px',
-                  background: '#00a884',
+                  background: '#732E4A',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 10,
@@ -787,7 +831,7 @@ export default function Talk() {
               flex: 1, 
               overflowY: 'auto', 
               padding: 20,
-              backgroundImage: 'repeating-linear-gradient(45deg, #efeae2 0px, #efeae2 10px, #e8e3db 10px, #e8e3db 20px)'
+              backgroundImage: 'repeating-linear-gradient(45deg, #FAF5F6 0px, #FAF5F6 10px, #F2DFE1 10px, #F2DFE1 20px)'
             }}>
               {messages.map((msg, i) => {
                 const isOwn = msg.sender === userName
@@ -810,7 +854,7 @@ export default function Talk() {
                     
                     <div style={{
                       maxWidth: '65%',
-                      background: isOwn ? '#d9fdd3' : '#fff',
+                      background: isOwn ? '#E8D3D7' : '#fff',
                       padding: '8px 12px',
                       borderRadius: 8,
                       boxShadow: '0 1px 2px rgba(0,0,0,0.1)'

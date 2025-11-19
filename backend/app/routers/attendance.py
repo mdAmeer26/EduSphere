@@ -81,7 +81,7 @@ async def enroll(name: str = Form(...), photo: UploadFile = File(...)) -> Dict[s
 @router.post("/recognize")
 async def recognize(photo: UploadFile = File(...)) -> Dict[str, Any]:
     """Recognize face and automatically mark attendance"""
-    data = await image.read()
+    data = await photo.read()
     try:
         img = Image.open(io.BytesIO(data)).convert('RGB')
     except Exception:
@@ -311,6 +311,14 @@ async def list_faces() -> Dict[str, Any]:
     """List all enrolled faces."""
     faces = _load_faces()
     return {"count": len(faces), "faces": [{"id": f["id"], "name": f["name"], "photo": f.get("photo")} for f in faces]}
+
+
+@router.get("/enrolled")
+async def get_enrolled_users() -> Dict[str, Any]:
+    """Get all enrolled users."""
+    faces = _load_faces()
+    users = [{"id": f["id"], "name": f["name"], "photo": f.get("photo")} for f in faces]
+    return {"ok": True, "users": users, "count": len(users)}
 
 
 @router.post("/auto-recognize")

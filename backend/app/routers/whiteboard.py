@@ -173,9 +173,115 @@ async def solve_math(req: SolveRequest) -> Dict[str, Any]:
 
 @router.post("/solve-text")
 async def solve_text_problem(req: TextSolveRequest) -> Dict[str, Any]:
-    """Solve text-based math problems with AI assistance"""
-    result = await _solve_advanced_problem(req.problem, req.type, req.show_steps)
+    """Solve ALL types of questions: Math, Geometry, GK, Science!"""
+    result = await _solve_any_question(req.problem, req.type, req.show_steps)
     return {"ok": True, **result}
+
+
+async def _solve_any_question(question: str, q_type: str, show_steps: bool) -> Dict[str, Any]:
+    """Universal solver for ALL question types - Quick answers first, then EduChat"""
+    
+    question_lower = question.lower()
+    
+    # === PRIORITY 1: INSTANT QUICK ANSWERS ===
+    # World Capitals
+    capitals = {
+        'india': 'New Delhi', 'france': 'Paris', 'usa': 'Washington D.C.', 'united states': 'Washington D.C.',
+        'china': 'Beijing', 'japan': 'Tokyo', 'uk': 'London', 'united kingdom': 'London',
+        'germany': 'Berlin', 'italy': 'Rome', 'spain': 'Madrid', 'russia': 'Moscow',
+        'canada': 'Ottawa', 'australia': 'Canberra', 'brazil': 'Brasília', 'mexico': 'Mexico City'
+    }
+    
+    if 'capital' in question_lower:
+        for country, capital in capitals.items():
+            if country in question_lower:
+                return {
+                    "result": capital,
+                    "answer": f"The capital of {country.title()} is **{capital}**. 🏛️",
+                    "category": "Geography - World Capitals",
+                    "steps": None
+                }
+    
+    # Science Quick Facts
+    if 'h2o' in question_lower or ('water' in question_lower and 'formula' in question_lower):
+        return {
+            "result": "H₂O",
+            "answer": "**H₂O** is water - 2 hydrogen atoms + 1 oxygen atom. Bent molecule (104.5°). Boiling: 100°C, Freezing: 0°C. Essential for all life! 💧",
+            "category": "Chemistry",
+            "steps": None
+        }
+    
+    if 'photosynthesis' in question_lower:
+        return {
+            "result": "6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂",
+            "answer": "**Photosynthesis**: Plants convert light, CO₂, and water into glucose and oxygen. Happens in chloroplasts using chlorophyll. 🌱",
+            "category": "Biology",
+            "steps": None
+        }
+    
+    if 'dna' in question_lower and not 'rna' in question_lower:
+        return {
+            "result": "Deoxyribonucleic Acid",
+            "answer": "**DNA** is the hereditary material containing genetic instructions. Double helix structure with base pairs A-T and G-C. Found in cell nucleus. 🧬",
+            "category": "Biology - Genetics",
+            "steps": None
+        }
+    
+    # Math Quick Answers
+    if 'pythagorean' in question_lower or 'pythagoras' in question_lower:
+        return {
+            "result": "a² + b² = c²",
+            "answer": "**Pythagorean Theorem**: In a right triangle, the square of the hypotenuse equals the sum of squares of the other two sides. 📐",
+            "category": "Geometry",
+            "steps": ["Formula: a² + b² = c²", "Where a,b are legs and c is hypotenuse", "Example: If a=3, b=4, then c=√(9+16)=5"],
+        }
+    
+    if 'area' in question_lower and 'circle' in question_lower:
+        return {
+            "result": "A = πr²",
+            "answer": "**Area of circle** = π × radius². Where π ≈ 3.14159. Example: Circle with radius 5 has area = 25π ≈ 78.54 square units. ⭕",
+            "category": "Geometry",
+            "steps": None
+        }
+    
+    if 'area' in question_lower and 'triangle' in question_lower:
+        return {
+            "result": "A = ½ × base × height",
+            "answer": "**Area of triangle** = ½ × base × height. Example: Triangle with base=6 and height=4 has area = ½(6)(4) = 12 square units. 🔺",
+            "category": "Geometry",
+            "steps": None
+        }
+    
+    # === PRIORITY 2: MATH EQUATIONS ===
+    if any(c in question for c in ['+', '-', '*', '/', '=']) or re.search(r'\d+\s*[x]\s*[+\-*/]', question):
+        try:
+            math_result = await _solve_advanced_problem(question, 'math', show_steps)
+            if math_result and not math_result.get('error'):
+                return math_result
+        except:
+            pass
+    
+    # === PRIORITY 3: EDUCHAT COMPREHENSIVE KNOWLEDGE ===
+    try:
+        from app.routers.educhat import KNOWLEDGE_BASE, _detect_educational_context, _extract_knowledge, _generate_intelligent_response
+        
+        context = _detect_educational_context(question)
+        knowledge = _extract_knowledge(question, context)
+        answer = _generate_intelligent_response(question, context, knowledge)
+        
+        # Only use EduChat if it gives a real answer (not generic fallback)
+        if answer and not answer.startswith("I don't have specific information") and not answer.startswith("I appreciate your question"):
+            return {
+                "result": answer[:200] if len(answer) > 200 else answer,
+                "answer": answer,
+                "category": ", ".join(context) if context else "General Knowledge",
+                "steps": None
+            }
+    except:
+        pass
+    
+    # === PRIORITY 4: FALLBACK ===
+    return await _solve_advanced_problem(question, q_type, show_steps)
 
 
 def _solve_with_steps(expr: str, show_steps: bool = True) -> Dict[str, Any]:
@@ -366,6 +472,7 @@ def _extract_math_expressions(text: str) -> List[str]:
     text = text.replace('l', '1').replace('I', '1').replace('|', '1')
     text = text.replace('S', '5').replace('s', '5')
     text = text.replace('B', '8').replace('Z', '2')
+    text = text.replace('?', '').replace('!', '')
     
     # Find lines with math operators and numbers
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -381,9 +488,26 @@ def _extract_math_expressions(text: str) -> List[str]:
     # If no expressions found, try to extract any numbers with operators
     if not expressions:
         # Look for patterns like "1+1", "2*3", etc.
-        pattern = r'\d+[\+\-\*/=]\d+'
-        matches = re.findall(pattern, text)
-        expressions.extend(matches)
+        patterns = [
+            r'\d+\s*\+\s*\d+',  # Addition: 1+1, 1 + 1
+            r'\d+\s*\-\s*\d+',  # Subtraction
+            r'\d+\s*\*\s*\d+',  # Multiplication
+            r'\d+\s*/\s*\d+',   # Division
+            r'\d+\s*=\s*\?',    # Equation format: 1+1=?
+        ]
+        for pattern in patterns:
+            matches = re.findall(pattern, text)
+            expressions.extend([m.replace(' ', '') for m in matches])
+    
+    # NEW: If still nothing, try to find consecutive numbers and assume addition
+    if not expressions:
+        # Look for pattern: digit digit (like "1 1" which might be "1+1")
+        numbers = re.findall(r'\d+', text)
+        if len(numbers) == 2:
+            expressions.append(f"{numbers[0]}+{numbers[1]}")
+        elif len(numbers) >= 2:
+            # Try first two numbers
+            expressions.append(f"{numbers[0]}+{numbers[1]}")
     
     return expressions
 
@@ -530,16 +654,126 @@ async def _solve_advanced_problem(problem: str, prob_type: str, show_steps: bool
     return _solve_with_steps(problem, show_steps)
 
 
+def _detect_shapes(img: Image.Image) -> Dict[str, Any]:
+    """Detect geometric shapes in the image (triangles, circles, rectangles, etc.)"""
+    try:
+        # FIRST: Check if there's text/numbers using OCR
+        # If OCR finds numbers or operators, skip shape detection
+        if pytesseract:
+            try:
+                quick_text = pytesseract.image_to_string(img, config='--psm 6').strip()
+                # If we find any digits or math operators, this is NOT a pure shape
+                if any(char in quick_text for char in '0123456789+-*/='):
+                    return {"detected": False}
+            except:
+                pass
+        
+        # Convert to grayscale and numpy array
+        gray = img.convert('L')
+        img_array = np.array(gray)
+        
+        # Simple edge detection - count dark pixels forming closed shapes
+        # Threshold: anything darker than 200 is considered drawn
+        binary = (img_array < 200).astype(np.uint8) * 255
+        
+        # Count contiguous regions (shapes)
+        # Detect if there are significant dark pixels (a drawing exists)
+        dark_pixels = np.sum(binary > 0)
+        total_pixels = binary.shape[0] * binary.shape[1]
+        coverage = dark_pixels / total_pixels
+        
+        # If less than 0.1% coverage, no significant drawing (more sensitive)
+        if coverage < 0.001:
+            return {"detected": False}
+        
+        # Analyze shape characteristics
+        # Find bounding box of the drawing
+        rows = np.any(binary > 0, axis=1)
+        cols = np.any(binary > 0, axis=0)
+        
+        if not np.any(rows) or not np.any(cols):
+            return {"detected": False}
+        
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+        
+        width = x_max - x_min
+        height = y_max - y_min
+        
+        # Require minimum size (at least 30 pixels in each dimension)
+        if width < 30 or height < 30:
+            return {"detected": False}
+        
+        aspect_ratio = width / height if height > 0 else 1
+        
+        # Extract the shape region
+        shape_region = binary[y_min:y_max+1, x_min:x_max+1]
+        
+        # Count corners/vertices - triangles are low density, pointy
+        shape_density = np.sum(shape_region > 0) / (width * height) if width > 0 and height > 0 else 0
+        
+        # Detect based on characteristics (more forgiving ranges)
+        if 0.5 <= aspect_ratio <= 1.5 and shape_density < 0.5:
+            # Likely a triangle (low density, roughly square aspect ratio, hollow)
+            return {
+                "detected": True,
+                "result": "Triangle 🔺",
+                "answer": "**Triangle Detected!**\n\n**Properties:**\n• 3 sides and 3 vertices\n• Sum of interior angles = 180°\n• Area = ½ × base × height\n\n**Types:**\n• Equilateral: All sides equal\n• Isosceles: Two sides equal\n• Scalene: All sides different\n• Right: Has a 90° angle\n\n**Formulas:**\n• Perimeter = a + b + c\n• Area = ½bh or √[s(s-a)(s-b)(s-c)] (Heron's formula)\n• Pythagorean theorem (right triangle): a² + b² = c²",
+                "category": "Geometry - Shapes",
+                "steps": [
+                    "Identified shape as a triangle",
+                    "Triangle has 3 sides and 3 angles",
+                    "Interior angles always sum to 180°",
+                    "Use appropriate formula based on type"
+                ]
+            }
+        elif 0.85 <= aspect_ratio <= 1.15 and shape_density > 0.5:
+            # Likely a circle (very symmetric, high density)
+            return {
+                "detected": True,
+                "result": "Circle ⭕",
+                "answer": "**Circle Detected!**\n\n**Properties:**\n• All points equidistant from center\n• Infinite lines of symmetry\n• 360 degrees around\n\n**Formulas:**\n• Area = πr²\n• Circumference = 2πr = πd\n• π ≈ 3.14159\n\n**Example:** If radius = 5, Area = 25π ≈ 78.54 square units",
+                "category": "Geometry - Shapes",
+                "steps": None
+            }
+        elif aspect_ratio > 1.4 or aspect_ratio < 0.6:
+            # Rectangle/square (elongated)
+            return {
+                "detected": True,
+                "result": "Rectangle 📐",
+                "answer": "**Rectangle Detected!**\n\n**Properties:**\n• 4 sides, opposite sides equal\n• All angles are 90°\n• If all sides equal = Square\n\n**Formulas:**\n• Area = length × width\n• Perimeter = 2(l + w)\n• Square: A = s², P = 4s",
+                "category": "Geometry - Shapes",
+                "steps": None
+            }
+        else:
+            # Generic shape
+            return {
+                "detected": True,
+                "result": "Geometric Shape",
+                "answer": "**Shape Detected!** 🔷\n\nI can see you drew a geometric shape! Common shapes:\n• Triangle 🔺: 3 sides, angles = 180°\n• Circle ⭕: A = πr²\n• Rectangle 📐: A = l×w\n• Square ⬜: A = s²\n\nType your geometry question below for detailed help!",
+                "category": "Geometry",
+                "steps": None
+            }
+    
+    except Exception:
+        return {"detected": False}
+
+
 @router.post("/solve")
 async def solve_board(image: UploadFile = File(...)) -> Dict[str, Any]:
-    """Solve problems from whiteboard image using OCR and AI"""
+    """Solve problems from whiteboard image using OCR, shape detection, and AI"""
     data = await image.read()
     try:
         img = Image.open(io.BytesIO(data))
     except Exception:
         return {"error": "Invalid image"}
     
-    # Try OpenAI Vision API first for best results
+    # FIRST: Try shape detection (triangles, circles, rectangles, etc.)
+    shape_result = _detect_shapes(img)
+    if shape_result.get('detected'):
+        return shape_result
+    
+    # Try OpenAI Vision API for complex problems
     if openai and OPENAI_API_KEY:
         vision_result = await _solve_with_vision(data)
         if vision_result.get('success'):
@@ -567,9 +801,10 @@ async def solve_board(image: UploadFile = File(...)) -> Dict[str, Any]:
     if not ocr_results:
         # Try solving simple expressions directly from image analysis
         return {
-            "error": "No text detected in image", 
-            "tip": "Try:\n1. Draw larger and clearer\n2. Use thicker pen\n3. Write in black on white background\n4. Try the text input box instead",
-            "suggestion": "Type '1+1' in the text input box below and click 'Solve Text Problem'"
+            "error": "No text or shapes detected. Please draw clearer or use the text input box below.", 
+            "tip": "Tips for better recognition:\n• Draw LARGER (use more of the canvas)\n• Use THICKER pen (marker mode)\n• Write in BLACK on WHITE background\n• Write clearly: '1+1' or '2*3'\n• Use the text input box for guaranteed results",
+            "quick_solve": "Type your math problem in the text input box and click 'Solve Text Problem' for instant results!",
+            "example": "Try typing: 1+1, 2*3, 10/2, (5+3)*2"
         }
     
     # Combine all OCR results
@@ -589,8 +824,11 @@ async def solve_board(image: UploadFile = File(...)) -> Dict[str, Any]:
     if not expressions:
         return {
             "ocr": combined_text, 
-            "error": "No mathematical expressions detected",
-            "tip": "Detected text but no math found. Try drawing: '1+1=?' or '2*3'"
+            "ocr_detected": "Yes - but no math found",
+            "error": "No mathematical expressions detected in the text",
+            "tip": "I saw text but couldn't find math. Try:\n• Writing operators clearly: + - * / =\n• Format: '1+1' or '2*3=?' or '5-2'\n• Use the TEXT INPUT BOX below for guaranteed accuracy!",
+            "detected_text": combined_text[:100],
+            "suggestion": "Use the text input box and type: 1+1, 2*3, 10/2, etc."
         }
     
     # Solve each expression

@@ -206,14 +206,14 @@ export default function Blogs() {
   }
 
   return (
-    <Page title="EduBlogs – Professional Learning Network" description="Connect, share, and grow your professional network">
+    <Page title="✍️ EduBlogs Network" description="Connect with educators, share your knowledge, and build your professional learning community">
       <div style={{ display: 'flex', gap: 20 }}>
         {/* Sidebar */}
         <div style={{ width: 240, flexShrink: 0 }}>
           <div style={{ position: 'sticky', top: 20 }}>
             {/* Profile Card */}
             <div style={{ 
-              background: 'var(--background-secondary)', 
+              background: '#FAF5F6', 
               borderRadius: 12, 
               padding: 16, 
               marginBottom: 16,
@@ -223,7 +223,7 @@ export default function Blogs() {
                 width: 80, 
                 height: 80, 
                 borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)',
                 margin: '0 auto 12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -248,7 +248,7 @@ export default function Blogs() {
             </div>
 
             {/* Navigation */}
-            <div style={{ background: 'var(--background-secondary)', borderRadius: 12, padding: 8 }}>
+            <div style={{ background: '#FAF5F6', borderRadius: 12, padding: 8 }}>
               {[
                 { id: 'feed', icon: '🏠', label: 'Feed' },
                 { id: 'profile', icon: '👤', label: 'Profile' },
@@ -267,7 +267,7 @@ export default function Blogs() {
                     cursor: 'pointer',
                     borderRadius: 8,
                     marginBottom: 4,
-                    background: view === item.id ? 'var(--primary)' : 'transparent',
+                    background: view === item.id ? 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)' : 'transparent',
                     color: view === item.id ? 'white' : 'inherit',
                     display: 'flex',
                     alignItems: 'center',
@@ -311,7 +311,7 @@ export default function Blogs() {
           {view === 'feed' && (
             <div>
               {/* Create Post */}
-              <div style={{ background: 'var(--background-secondary)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <div style={{ background: '#FAF5F6', borderRadius: 12, padding: 20, marginBottom: 20 }}>
                 <h3 style={{ margin: '0 0 16px 0' }}>Share Something</h3>
                 <form onSubmit={createPost}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -322,9 +322,9 @@ export default function Blogs() {
                         onClick={() => setPostType(type)}
                         style={{
                           padding: '8px 16px',
-                          border: postType === type ? '2px solid var(--primary)' : '1px solid var(--border)',
+                          border: postType === type ? '2px solid #732E4A' : '1px solid var(--border)',
                           borderRadius: 8,
-                          background: postType === type ? 'var(--primary)' : 'white',
+                          background: postType === type ? 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)' : 'white',
                           color: postType === type ? 'white' : 'inherit',
                           cursor: 'pointer',
                           fontSize: 13,
@@ -415,7 +415,7 @@ export default function Blogs() {
               {posts.length === 0 && !loading ? <Empty>No posts yet. Be the first to share!</Empty> :
                 posts.map(post => (
                   <div key={post.id} style={{
-                    background: 'var(--background-secondary)',
+                    background: '#FAF5F6',
                     borderRadius: 12,
                     padding: 20,
                     marginBottom: 16
@@ -426,7 +426,7 @@ export default function Blogs() {
                         width: 48,
                         height: 48,
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -465,8 +465,8 @@ export default function Blogs() {
                             style={{
                               display: 'inline-block',
                               padding: '4px 8px',
-                              background: '#e0e7ff',
-                              color: '#667eea',
+                              background: '#F2DFE1',
+                              color: '#732E4A',
                               borderRadius: 4,
                               fontSize: 12,
                               marginRight: 6,
@@ -492,7 +492,7 @@ export default function Blogs() {
                               onClick={() => votePoll(post.id, option)}
                               style={{
                                 padding: '12px',
-                                border: hasVoted ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                border: hasVoted ? '2px solid #732E4A' : '1px solid var(--border)',
                                 borderRadius: 8,
                                 marginBottom: 8,
                                 cursor: 'pointer',
@@ -507,7 +507,7 @@ export default function Blogs() {
                                   top: 0,
                                   height: '100%',
                                   width: `${percentage}%`,
-                                  background: 'rgba(102, 126, 234, 0.1)',
+                                  background: 'rgba(179, 143, 146, 0.15)',
                                   transition: 'width 0.3s'
                                 }}
                               />
@@ -564,7 +564,7 @@ export default function Blogs() {
 
           {/* Profile View */}
           {view === 'profile' && (
-            <div style={{ background: 'var(--background-secondary)', borderRadius: 12, padding: 24 }}>
+            <div style={{ background: '#FAF5F6', borderRadius: 12, padding: 24 }}>
               {!editProfile ? (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 24 }}>
@@ -585,8 +585,8 @@ export default function Blogs() {
                       {profileSkills.split(',').map((skill, i) => (
                         <span key={i} style={{
                           padding: '8px 16px',
-                          background: '#e0e7ff',
-                          color: '#667eea',
+                          background: '#F2DFE1',
+                          color: '#732E4A',
                           borderRadius: 20,
                           fontSize: 14,
                           fontWeight: 600
@@ -632,14 +632,14 @@ export default function Blogs() {
               {jobs.length === 0 ? <Empty>No jobs posted yet.</Empty> :
                 jobs.map(job => (
                   <div key={job.id} style={{
-                    background: 'var(--background-secondary)',
+                    background: '#FAF5F6',
                     borderRadius: 12,
                     padding: 20,
                     marginBottom: 16
                   }}>
                     <div style={{ marginBottom: 12 }}>
                       <h3 style={{ margin: '0 0 4px 0' }}>{job.title}</h3>
-                      <p style={{ margin: '0 0 4px 0', fontSize: 15, fontWeight: 600, color: '#667eea' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: 15, fontWeight: 600, color: '#732E4A' }}>
                         {job.company}
                       </p>
                       <p style={{ margin: 0, fontSize: 14, color: '#666' }}>
@@ -666,7 +666,7 @@ export default function Blogs() {
                   <h3 style={{ margin: '0 0 12px 0' }}>Posts</h3>
                   {searchResults.posts.map(post => (
                     <div key={post.id} style={{
-                      background: 'var(--background-secondary)',
+                      background: '#FAF5F6',
                       borderRadius: 12,
                       padding: 16,
                       marginBottom: 12
@@ -685,7 +685,7 @@ export default function Blogs() {
                   <h3 style={{ margin: '0 0 12px 0' }}>People</h3>
                   {searchResults.people.map(person => (
                     <div key={person.user_id} style={{
-                      background: 'var(--background-secondary)',
+                      background: '#FAF5F6',
                       borderRadius: 12,
                       padding: 16,
                       marginBottom: 12,
@@ -697,7 +697,7 @@ export default function Blogs() {
                         width: 48,
                         height: 48,
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #732E4A 0%, #B38F92 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -722,7 +722,7 @@ export default function Blogs() {
             {/* Notifications */}
             {notifications.length > 0 && (
               <div style={{
-                background: 'var(--background-secondary)',
+                background: '#FAF5F6',
                 borderRadius: 12,
                 padding: 16,
                 marginBottom: 16
@@ -751,7 +751,7 @@ export default function Blogs() {
 
             {/* Trending Topics */}
             <div style={{
-              background: 'var(--background-secondary)',
+              background: '#FAF5F6',
               borderRadius: 12,
               padding: 16
             }}>
@@ -764,7 +764,7 @@ export default function Blogs() {
                     borderBottom: i < 4 ? '1px solid var(--border)' : 'none',
                     fontSize: 13,
                     cursor: 'pointer',
-                    color: '#667eea',
+                    color: '#732E4A',
                     fontWeight: 600
                   }}
                   onClick={() => {
