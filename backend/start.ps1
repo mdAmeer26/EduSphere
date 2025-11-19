@@ -19,7 +19,7 @@ Write-Host "Installing dependencies..." -ForegroundColor Yellow
 & ".\.venv\Scripts\python.exe" -m pip install -r requirements.txt --quiet
 
 # Set OpenAI API Key (for real AI generation)
-$env:OPENAI_API_KEY = "<your-openai-api-key>"
+# $env:OPENAI_API_KEY = "<your-openai-api-key>"  # Set this manually or via environment variable before running
 
 # Start Uvicorn
 Write-Host "Starting FastAPI on http://127.0.0.1:8000" -ForegroundColor Green
