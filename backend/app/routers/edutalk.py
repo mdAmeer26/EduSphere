@@ -6,11 +6,11 @@ from datetime import datetime
 from fastapi import APIRouter, Form, UploadFile, File, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 
 router = APIRouter()
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 CHATS_STORE = os.path.join(ROOT, "uploads", "edutalk_chats.json")
 GROUPS_STORE = os.path.join(ROOT, "uploads", "edutalk_groups.json")
 CHANNELS_STORE = os.path.join(ROOT, "uploads", "edutalk_channels.json")

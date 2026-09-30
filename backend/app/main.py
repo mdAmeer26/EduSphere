@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 
 from app.routers import edupdf, edutube, eduexcel, edupresent, edunotes, educhart, edudoc, educhat, stubs
+from app.utils.storage import STORAGE_ROOT
 import app.routers.whiteboard as whiteboard
 import app.routers.attendance as attendance
 import app.routers.blogs as blogs
@@ -32,9 +33,7 @@ app.add_middleware(
 )
 
 # Ensure upload dir exists
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_ROOT = os.path.join(os.path.dirname(BASE_DIR), "uploads")
-os.makedirs(UPLOAD_ROOT, exist_ok=True)
+UPLOAD_ROOT = STORAGE_ROOT
 
 # Static serving for generated files
 static_mount = os.path.join(os.path.dirname(BASE_DIR), "uploads")

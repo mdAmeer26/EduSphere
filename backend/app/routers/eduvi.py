@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from pydantic import BaseModel
 
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 
 # Load .env file if exists
 try:
@@ -31,7 +31,7 @@ except Exception as e:
 
 router = APIRouter()
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 IMG_DIR = os.path.join(ROOT, "uploads", "eduvi_images")
 VID_DIR = os.path.join(ROOT, "uploads", "eduvi_videos")
 PROJECTS_STORE = os.path.join(ROOT, "uploads", "eduvi_projects.json")

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 
 from app.utils.summarizer import summarize_text, generate_notes, generate_questions
+from app.utils.storage import STORAGE_ROOT
 
 router = APIRouter()
 
@@ -114,7 +115,7 @@ async def analyze(req: YouTubeAnalyzeRequest) -> Dict[str, Any]:
 
     # Save transcript for Q&A
     uid = str(uuid.uuid4())
-    transcript_file = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", f"{uid}_transcript.txt")
+    transcript_file = os.path.join(STORAGE_ROOT, f"{uid}_transcript.txt")
     os.makedirs(os.path.dirname(transcript_file), exist_ok=True)
     
     with open(transcript_file, "w", encoding="utf-8") as f:
@@ -158,7 +159,7 @@ class YouTubeQARequest(BaseModel):
 
 @router.post("/qa")
 async def qa(req: YouTubeQARequest) -> Dict[str, Any]:
-    transcript_file = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", f"{req.transcript_id}_transcript.txt")
+    transcript_file = os.path.join(STORAGE_ROOT, f"{req.transcript_id}_transcript.txt")
     
     try:
         if not os.path.exists(transcript_file):

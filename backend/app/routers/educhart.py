@@ -10,10 +10,11 @@ import numpy as np
 from matplotlib.patches import FancyBboxPatch
 from fastapi import APIRouter
 from pydantic import BaseModel
+from app.utils.storage import STORAGE_ROOT
 
 router = APIRouter()
 
-EXPORT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "uploads"))
+EXPORT_ROOT = STORAGE_ROOT
 os.makedirs(EXPORT_ROOT, exist_ok=True)
 
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 import io
 import numpy as np
+from app.utils.storage import STORAGE_ROOT
 
 try:
     import pytesseract  # type: ignore
@@ -32,8 +33,7 @@ except Exception:
 
 router = APIRouter()
 
-EXPORT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "uploads"))
-os.makedirs(EXPORT_ROOT, exist_ok=True)
+EXPORT_ROOT = STORAGE_ROOT
 SESSIONS_FILE = os.path.join(EXPORT_ROOT, "whiteboard_sessions.json")
 
 

@@ -8,12 +8,11 @@ from fastapi import APIRouter, File, UploadFile, Form
 
 from app.utils.pdf_tools import extract_pdf_text_with_ocr_fallback, extract_ppt_text
 from app.utils.summarizer import summarize_text, generate_notes, generate_questions
+from app.utils.storage import STORAGE_ROOT
 
 router = APIRouter()
 
-UPLOAD_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "uploads")
-UPLOAD_ROOT = os.path.abspath(UPLOAD_ROOT)
-os.makedirs(UPLOAD_ROOT, exist_ok=True)
+UPLOAD_ROOT = STORAGE_ROOT
 
 
 @router.post("/analyze")

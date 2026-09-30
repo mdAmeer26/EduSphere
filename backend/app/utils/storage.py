@@ -2,6 +2,15 @@ import json
 import os
 from typing import Any, List
 
+BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+LOCAL_STORAGE_ROOT = os.path.join(BACKEND_ROOT, "uploads")
+STORAGE_ROOT = os.getenv(
+    "EDUSPHERE_STORAGE_DIR",
+    "/tmp/edusphere" if os.getenv("VERCEL") else LOCAL_STORAGE_ROOT,
+)
+
+os.makedirs(STORAGE_ROOT, exist_ok=True)
+
 
 def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)

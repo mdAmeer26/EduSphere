@@ -9,10 +9,11 @@ from pydantic import BaseModel
 from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from app.utils.storage import STORAGE_ROOT
 
 router = APIRouter()
 
-STORAGE = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "uploads"))
+STORAGE = STORAGE_ROOT
 DOC_METADATA = os.path.join(STORAGE, "doc_metadata.json")
 os.makedirs(STORAGE, exist_ok=True)
 

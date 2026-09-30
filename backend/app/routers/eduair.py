@@ -6,12 +6,12 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 import sympy as sp
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
 
 router = APIRouter()
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 SESSIONS_STORE = os.path.join(ROOT, "uploads", "eduair_sessions.json")
 
 class HandLandmark(BaseModel):

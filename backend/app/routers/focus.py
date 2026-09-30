@@ -8,12 +8,12 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 SESSIONS_STORE = os.path.join(ROOT, "uploads", "focus_sessions.json")
 BLOCKLIST_STORE = os.path.join(ROOT, "uploads", "focus_blocklist.json")
 

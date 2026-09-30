@@ -6,11 +6,11 @@ from datetime import datetime
 from fastapi import APIRouter, Form
 from pydantic import BaseModel
 
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 
 router = APIRouter()
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 STORE = os.path.join(ROOT, "uploads", "blogs.json")
 USERS_STORE = os.path.join(ROOT, "uploads", "blogs_users.json")
 CONNECTIONS_STORE = os.path.join(ROOT, "uploads", "blogs_connections.json")

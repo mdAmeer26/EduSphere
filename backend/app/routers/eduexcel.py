@@ -5,10 +5,11 @@ from typing import Any, Dict
 
 import pandas as pd
 from fastapi import APIRouter, File, UploadFile
+from app.utils.storage import STORAGE_ROOT
 
 router = APIRouter()
 
-EXPORT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "uploads"))
+EXPORT_ROOT = STORAGE_ROOT
 os.makedirs(EXPORT_ROOT, exist_ok=True)
 
 

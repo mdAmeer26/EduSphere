@@ -7,11 +7,11 @@ from fastapi import APIRouter, Form
 from pydantic import BaseModel
 from typing import List, Optional
 
-from app.utils.storage import load_list, save_list
+from app.utils.storage import STORAGE_ROOT, load_list, save_list
 
 router = APIRouter()
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".."))
+ROOT = os.path.dirname(STORAGE_ROOT)
 STORE = os.path.join(ROOT, "uploads", "internships.json")
 APPLICATIONS_STORE = os.path.join(ROOT, "uploads", "internship_applications.json")
 SCHOLARSHIPS_STORE = os.path.join(ROOT, "uploads", "internship_scholarships.json")
