@@ -37,6 +37,10 @@ yarn-error.log*
 frontend/node_modules/
 frontend/dist/
 
+# Frontend source helpers
+!frontend/src/lib/
+!frontend/src/lib/**
+
 # Environment variables
 .env
 .env.local

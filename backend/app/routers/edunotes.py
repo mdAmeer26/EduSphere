@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import aiofiles
 from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.utils.pdf_tools import extract_pdf_text_with_ocr_fallback
