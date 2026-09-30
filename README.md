@@ -221,7 +221,7 @@ npm run preview
 Vercel should host the Vite frontend. Deploy the FastAPI backend separately on a Python-capable host such as Render or Railway, because the backend uses local file storage and WebSockets that are not suitable for a standard Vercel frontend deployment.
 
 1. Push this repository to GitHub and create one Vercel project with **Root Directory** set to `frontend`.
-2. Vercel will use `frontend/vercel.json`, build with `npm run build`, and publish `dist`.
+2. Vercel will auto-detect Vite, run `npm run build`, and publish `dist`.
 3. Create a second Vercel project for the backend with **Root Directory** set to `backend`.
 4. The backend project uses `backend/api/index.py` and `backend/vercel.json`.
 5. Add `VITE_API_BASE` to the frontend project, set to the backend project URL, for example `https://your-api.example.com`.
