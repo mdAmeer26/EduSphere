@@ -36,7 +36,7 @@ app.add_middleware(
 UPLOAD_ROOT = STORAGE_ROOT
 
 # Static serving for generated files
-static_mount = os.path.join(os.path.dirname(BASE_DIR), "uploads")
+static_mount = STORAGE_ROOT
 app.mount("/files", StaticFiles(directory=static_mount), name="files")
 
 # Routers
